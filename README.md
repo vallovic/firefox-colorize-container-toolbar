@@ -1,6 +1,6 @@
 # Colorize Container Toolbar - Light & Dark Themes
 
-Firefox extension to automatically colorize browser toolbar by matching the color of the active container tab -only colorizes toolbar and active tab, nothing else.
+Firefox extension to automatically colorize browser toolbar by matching the color of the active container tab - only colorizes toolbar and active tab, nothing else.
 
 Keeps consistent across theme changes and works with default Firefox light and dark themes (doesn't work with the most recent Firefox Alpenglow theme). Compatible with Firefox 89+.
 
