@@ -60,8 +60,9 @@ class containersTheme {
 			const toolbarColor = shadeBlendConvert(auxCurrentTheme.colors.popup !== '#fff' ? -0.6 : 0.75, container.colorCode);
 
 			// Finally set theme with new toolbar color
+			auxCurrentTheme.colors.tab_selected = toolbarColor
 			auxCurrentTheme.colors.toolbar = toolbarColor
-			auxCurrentTheme.colors.toolbar_field = toolbarColor
+			// auxCurrentTheme.colors.toolbar_field = toolbarColor
 			browser.theme.update(windowId, auxCurrentTheme);
 		} else {
 			// Keep current theme toolbar
