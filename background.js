@@ -20,9 +20,6 @@ const shadeBlendConvert = function (p, from, to) {
 	else return "#"+(0x100000000+r((t[0]-f[0])*p+f[0])*0x1000000+r((t[1]-f[1])*p+f[1])*0x10000+r((t[2]-f[2])*p+f[2])*0x100+(f[3]>-1&&t[3]>-1?r(((t[3]-f[3])*p+f[3])*255):t[3]>-1?r(t[3]*255):f[3]>-1?r(f[3]*255):255)).toString(16).slice(1,f[3]>-1||t[3]>-1?undefined:-2);
 }
 
-// Save current theme settings
-let currentTheme = null;
-
 class containersTheme {
 	constructor() {
 		browser.tabs.onActivated.addListener((activeInfo) => {
@@ -30,43 +27,39 @@ class containersTheme {
 		});
 	}
 
-	isUnpaintedTheme(currentCookieStore) {
-		return (currentCookieStore == "firefox-default" ||
-						currentCookieStore == "firefox-private");
+	isContainerizedTab(currentCookieStore) {
+		return (currentCookieStore !== "firefox-default" &&
+						currentCookieStore !== "firefox-private");
 	}
 
 	async updateTabContainerTheme(tabId, windowId) {
-		// Check if current theme settings have already been set
-		if (currentTheme === null) {
-			currentTheme = await browser.theme.getCurrent();
-		} else {
-			// If they were, check if the theme hasn't changed, like from Light to Dark or from Dark to Light
-			const newCurrentTheme = await browser.theme.getCurrent();
+		// Get and deep copy current theme
+		const newCurrentTheme = {... await browser.theme.getCurrent() };
 
-			// Popup color could be different if theme changed so set new current theme
-			if (newCurrentTheme.colors.popup !== currentTheme.colors.popup)
-				currentTheme = JSON.parse(JSON.stringify(newCurrentTheme));
+		// If theme is "System auto - theme", `properties` will be `null` and tab can't be themed
+		// If theme is "Firefox Alpenglow", `color_scheme` will be `null` and tab won't be themed
+		if (!newCurrentTheme?.properties || !newCurrentTheme?.properties?.color_scheme) {
+			browser.theme.reset(windowId);
+			return;
 		}
 
 		const tab = await browser.tabs.get(tabId);
 
-		if (!this.isUnpaintedTheme(tab.cookieStoreId)) {
-			// Deep copy current theme
-			const auxCurrentTheme = JSON.parse(JSON.stringify(currentTheme));
-
+		// Set only if tab is containerized
+		if (this.isContainerizedTab(tab.cookieStoreId)) {
 			const container = await browser.contextualIdentities.get(tab.cookieStoreId);
 
-			// If popup isn't white, shade it darker, if it is, shade it lighter
-			const toolbarColor = shadeBlendConvert(auxCurrentTheme.colors.popup !== '#fff' ? -0.6 : 0.75, container.colorCode);
+			// If it's dark scheme shade it darker else shade it lighter
+			const toolbarColor = shadeBlendConvert(newCurrentTheme?.properties?.color_scheme === "dark" ? -0.6 : 0.75, container.colorCode);
 
 			// Finally set theme with new toolbar color
-			auxCurrentTheme.colors.tab_selected = toolbarColor
-			auxCurrentTheme.colors.toolbar = toolbarColor
-			// auxCurrentTheme.colors.toolbar_field = toolbarColor
-			browser.theme.update(windowId, auxCurrentTheme);
+			newCurrentTheme.colors.tab_selected = toolbarColor
+			newCurrentTheme.colors.toolbar = toolbarColor
+			// newCurrentTheme.colors.toolbar_field = toolbarColor
+			browser.theme.update(windowId, newCurrentTheme);
 		} else {
-			// Keep current theme toolbar
-			browser.theme.update(windowId, currentTheme);
+			// Reset current theme toolbar
+			browser.theme.reset(windowId);
 		}
 	}
 }

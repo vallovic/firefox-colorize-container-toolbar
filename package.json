@@ -1,6 +1,6 @@
 {
   "name": "firefox-colorize-container-toolbar",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Firefox extension to automatically colorize browser toolbar by matching the color of the active container tab",
   "author": "vallovic",
   "license": "MPL-2.0",
