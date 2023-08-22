@@ -1,6 +1,6 @@
 // Credits : https://github.com/PimpTrizkit/PJs/wiki/12.-Shade,-Blend-and-Convert-a-Web-Color-(pSBC.js)
 // Version 3.1
-const shadeBlendConvert = function (p, from, to) {
+const shadeBlendConvert = (p, from, to) => {
 	if(typeof(p)!="number"||p<-1||p>1||typeof(from)!="string"||(from[0]!='r'&&from[0]!='#')||(to&&typeof(to)!="string"))return null; //ErrorCheck
 	if(!this.sbcRip)this.sbcRip=(d)=>{
 		let l=d.length,RGB={};
@@ -20,48 +20,63 @@ const shadeBlendConvert = function (p, from, to) {
 	else return "#"+(0x100000000+r((t[0]-f[0])*p+f[0])*0x1000000+r((t[1]-f[1])*p+f[1])*0x10000+r((t[2]-f[2])*p+f[2])*0x100+(f[3]>-1&&t[3]>-1?r(((t[3]-f[3])*p+f[3])*255):t[3]>-1?r(t[3]*255):f[3]>-1?r(f[3]*255):255)).toString(16).slice(1,f[3]>-1||t[3]>-1?undefined:-2);
 }
 
-class containersTheme {
-	constructor() {
-		browser.tabs.onActivated.addListener((activeInfo) => {
-			this.updateTabContainerTheme(activeInfo.tabId, activeInfo.windowId);
-		});
+let currentBrowserTheme;
+
+const isContainerizedTab = (currentCookieStore) => {
+	return (
+		currentCookieStore !== "firefox-default" &&
+		currentCookieStore !== "firefox-private"
+	);
+}
+
+const updateTabContainerTheme = async (tabId, windowId) => {
+	const currentTheme = await browser.theme.getCurrent();
+
+	// If theme is "System auto - theme", `properties` will be `null` and tab can't be themed
+	// If theme is "Firefox Alpenglow", `color_scheme` will be `null` and tab won't be themed
+	if (!currentTheme?.properties || !currentTheme?.properties?.color_scheme) {
+		browser.theme.reset(windowId);
+		return;
 	}
 
-	isContainerizedTab(currentCookieStore) {
-		return (currentCookieStore !== "firefox-default" &&
-						currentCookieStore !== "firefox-private");
+	// Update variable if current browser theme hasn't been set
+	// or theme has changed, like from Light to Dark or from Dark to Light
+	if (
+		!currentBrowserTheme ||
+		currentBrowserTheme?.properties?.color_scheme !==
+			currentTheme?.properties?.color_scheme
+	) {
+		currentBrowserTheme = structuredClone(currentTheme);
 	}
 
-	async updateTabContainerTheme(tabId, windowId) {
-		// Get and deep copy current theme
-		const newCurrentTheme = {... await browser.theme.getCurrent() };
+	const tab = await browser.tabs.get(tabId);
 
-		// If theme is "System auto - theme", `properties` will be `null` and tab can't be themed
-		// If theme is "Firefox Alpenglow", `color_scheme` will be `null` and tab won't be themed
-		if (!newCurrentTheme?.properties || !newCurrentTheme?.properties?.color_scheme) {
-			browser.theme.reset(windowId);
-			return;
-		}
+	// Set only if tab is containerized
+	if (isContainerizedTab(tab.cookieStoreId)) {
+		// Deep copy current theme
+		const paintedTabTheme = structuredClone(currentTheme);
 
-		const tab = await browser.tabs.get(tabId);
+		const container = await browser.contextualIdentities.get(
+			tab.cookieStoreId,
+		);
 
-		// Set only if tab is containerized
-		if (this.isContainerizedTab(tab.cookieStoreId)) {
-			const container = await browser.contextualIdentities.get(tab.cookieStoreId);
+		// If it's dark scheme shade it darker else shade it lighter
+		const toolbarColor = shadeBlendConvert(
+			paintedTabTheme?.properties?.color_scheme === "dark" ? -0.6 : 0.75,
+			container.colorCode,
+		);
 
-			// If it's dark scheme shade it darker else shade it lighter
-			const toolbarColor = shadeBlendConvert(newCurrentTheme?.properties?.color_scheme === "dark" ? -0.6 : 0.75, container.colorCode);
-
-			// Finally set theme with new toolbar color
-			newCurrentTheme.colors.tab_selected = toolbarColor
-			newCurrentTheme.colors.toolbar = toolbarColor
-			// newCurrentTheme.colors.toolbar_field = toolbarColor
-			browser.theme.update(windowId, newCurrentTheme);
-		} else {
-			// Reset current theme toolbar
-			browser.theme.reset(windowId);
-		}
+		// Finally set theme with new toolbar color
+		paintedTabTheme.colors.tab_selected = toolbarColor;
+		paintedTabTheme.colors.toolbar = toolbarColor;
+		// paintedTabTheme.colors.toolbar_field = toolbarColor
+		browser.theme.update(windowId, paintedTabTheme);
+	} else {
+		// Keep current browser theme toolbar
+		browser.theme.update(windowId, currentBrowserTheme);
 	}
 }
 
-new containersTheme();
+browser.tabs.onActivated.addListener((activeInfo) => {
+	updateTabContainerTheme(activeInfo.tabId, activeInfo.windowId);
+});
